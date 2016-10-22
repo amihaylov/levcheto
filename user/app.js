@@ -19,7 +19,7 @@ debug("Loading Mongoose functionality");
 var mongoose = require('mongoose');
 mongoose.set('debug', true);
 mongoose.connect(mongoose_uri);
-mongoose.connection.on('error', function () {
+mongoose.connection.on('error', function() {
     debug('Mongoose connection error');
 });
 mongoose.connection.once('open', function callback() {
@@ -27,7 +27,8 @@ mongoose.connection.once('open', function callback() {
 });
 
 debug("Initializing express");
-var express = require('express'), app = express();
+var express = require('express'),
+    app = express();
 
 debug("Attaching plugins");
 app.use(require('morgan')("dev"));
@@ -37,9 +38,9 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(require('compression')());
 app.use(require('response-time')());
 
-app.use(function (req, res, next) {
+app.use(function(req, res, next) {
 
-    onFinished(res, function (err) {
+    onFinished(res, function(err) {
         debug("[%s] finished request", req.connection.remoteAddress);
     });
 
@@ -52,33 +53,37 @@ var jwtCheck = jwt({
 });
 jwtCheck.unless = unless;
 
-app.use(jwtCheck.unless({path: ['/api/login', '/api/create'] }));
-app.use(utils.middleware().unless({path: ['/api/login', '/api/create'] }));
+app.use(jwtCheck.unless({ path: ['/api/login', '/api/create'] }));
+// Non-admin routes
+app.use(utils.middleware().unless({ path: ['/api/login', '/api/create', '/api/update/:id', '/api/delete', '/api/getAll', '/api/isAdmin'] }));
+//Admin routes
+app.use(['/api/update/:id', '/api/delete', '/api/getAll', '/api/isAdmin'], utils.middleware(true));
+
 
 app.use("/api", require(path.join(__dirname, "routes", "default.js"))());
 
 // all other requests redirect to 404
-app.all("*", function (req, res, next) {
+app.all("*", function(req, res, next) {
     next(new NotFoundError("404"));
 });
 
 // error handler for all the applications
-app.use(function (err, req, res, next) {
+app.use(function(err, req, res, next) {
 
     var errorType = typeof err,
         code = 500,
-        msg = { message: "Internal Server Error" };
+        msg = { message: err.message || "Internal Server Error" };
 
     switch (err.name) {
         case "UnauthorizedError":
             code = err.status;
-            msg = undefined;
+            msg = err.message || err.inner.message;
             break;
         case "BadRequestError":
         case "UnauthorizedAccessError":
         case "NotFoundError":
             code = err.status;
-            msg = err.inner;
+            msg = err.message || err.inner.message;
             break;
         default:
             break;
@@ -89,7 +94,7 @@ app.use(function (err, req, res, next) {
 });
 
 debug("Creating HTTP server on port: %s", http_port);
-require('http').createServer(app).listen(http_port, function () {
+require('http').createServer(app).listen(http_port, function() {
     debug("HTTP Server listening on port: %s, in %s mode", http_port, app.get('env'));
 });
 
@@ -100,6 +105,6 @@ require('https').createServer({
     ca: fs.readFileSync(path.join(__dirname, "keys", "ca.crt")),
     requestCert: true,
     rejectUnauthorized: false
-}, app).listen(https_port, function () {
+}, app).listen(https_port, function() {
     debug("HTTPS Server listening on port: %s, in %s mode", https_port, app.get('env'));
 });

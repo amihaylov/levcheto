@@ -9,7 +9,6 @@ npm install
 
 Creation of user
 ----------------
-``` 
 node create_user.js demo demo
 ```
 
@@ -18,3 +17,6 @@ Starting application
 ```
 DEBUG=app:* node app.js
 ```
+
+More Info:
+https://matoski.com/article/jwt-express-node-mongoose/
