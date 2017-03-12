@@ -4,22 +4,30 @@ var mongoose = require('mongoose'),
     bcrypt = require("bcryptjs"),
     Schema = mongoose.Schema;
 
+var notEmptyValidator = function(val) {
+        return (val !== null && val !== undefined && val !== NaN && val !== '')
+    },
+    notEmpty = [notEmptyValidator, 'validation of {PATH} failed with value {VALUE}']
+
 var UserSchema = new Schema({
 
     username: {
         type: String,
         unique: true,
-        required: true
+        required: true,
+        validate: notEmpty
     },
 
     password: {
         type: String,
-        required: true
+        required: true,
+        validate: notEmpty
     },
     email: {
         type: String,
         required: true,
-        unique: true
+        unique: true,
+        validate: notEmpty
     },
     isAdmin: {
         type: Boolean,
@@ -29,19 +37,20 @@ var UserSchema = new Schema({
 }, {
     toObject: {
         virtuals: true
-    }, toJSON: {
+    },
+    toJSON: {
         virtuals: true
     }
 });
 
-UserSchema.pre('save', function (next) {
+UserSchema.pre('save', function(next) {
     var user = this;
     if (this.isModified('password') || this.isNew) {
-        bcrypt.genSalt(10, function (err, salt) {
+        bcrypt.genSalt(10, function(err, salt) {
             if (err) {
                 return next(err);
             }
-            bcrypt.hash(user.password, salt, function (err, hash) {
+            bcrypt.hash(user.password, salt, function(err, hash) {
                 if (err) {
                     return next(err);
                 }
@@ -54,8 +63,8 @@ UserSchema.pre('save', function (next) {
     }
 });
 
-UserSchema.methods.comparePassword = function (passw, cb) {
-    bcrypt.compare(passw, this.password, function (err, isMatch) {
+UserSchema.methods.comparePassword = function(passw, cb) {
+    bcrypt.compare(passw, this.password, function(err, isMatch) {
         if (err) {
             return cb(err);
         }

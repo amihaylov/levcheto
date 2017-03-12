@@ -12,11 +12,11 @@ var debug = require('debug')('app:utils:' + process.pid),
     TOKEN_EXPIRATION_SEC = TOKEN_EXPIRATION * 60,
     UnauthorizedAccessError = require(path.join(__dirname, 'errors', 'UnauthorizedAccessError.js'));
 
-client.on('error', function (err) {
+client.on('error', function(err) {
     debug(err);
 });
 
-client.on('connect', function () {
+client.on('connect', function() {
     debug("Redis successfully connected");
 });
 
@@ -26,7 +26,7 @@ client.on('connect', function () {
  * @param headers
  * @returns {*}
  */
-module.exports.fetch = function (headers) {
+module.exports.fetch = function(headers) {
     if (headers && headers.authorization) {
         var authorization = headers.authorization;
         var part = authorization.split(' ');
@@ -51,7 +51,7 @@ module.exports.fetch = function (headers) {
  *
  * @returns {*}
  */
-module.exports.create = function (user, req, res, next) {
+module.exports.create = function(user, req, res, next) {
 
     debug("Create token");
 
@@ -62,8 +62,7 @@ module.exports.create = function (user, req, res, next) {
     var data = {
         _id: user._id,
         username: user.username,
-        access: user.access,
-        name: user.name,
+        isAdmin: user.isAdmin,
         email: user.email,
         token: jsonwebtoken.sign({ _id: user._id }, config.secret, {
             expiresIn: TOKEN_EXPIRATION_SEC
@@ -77,13 +76,13 @@ module.exports.create = function (user, req, res, next) {
 
     debug("Token generated for user: %s, token: %s", data.username, data.token);
 
-    client.set(data.token, JSON.stringify(data), function (err, reply) {
+    client.set(data.token, JSON.stringify(data), function(err, reply) {
         if (err) {
             return next(new Error(err));
         }
 
         if (reply) {
-            client.expire(data.token, TOKEN_EXPIRATION_SEC, function (err, reply) {
+            client.expire(data.token, TOKEN_EXPIRATION_SEC, function(err, reply) {
                 if (err) {
                     return next(new Error("Can not set the expire value for the token key"));
                 }
@@ -94,8 +93,7 @@ module.exports.create = function (user, req, res, next) {
                     return next(new Error('Expiration not set on redis'));
                 }
             });
-        }
-        else {
+        } else {
             return next(new Error('Token not set in redis'));
         }
     });
@@ -111,7 +109,7 @@ module.exports.create = function (user, req, res, next) {
  * @param done
  * @returns {*}
  */
-module.exports.retrieve = function (id, done) {
+module.exports.retrieve = function(id, done) {
 
     debug("Calling retrieve for token: %s", id);
 
@@ -121,7 +119,7 @@ module.exports.retrieve = function (id, done) {
         });
     }
 
-    client.get(id, function (err, reply) {
+    client.get(id, function(err, reply) {
         if (err) {
             return done(err, {
                 "message": err
@@ -157,20 +155,20 @@ module.exports.retrieve = function (id, done) {
  * @param res
  * @param next
  */
-module.exports.verify = function (req, res, next) {
+module.exports.verify = function(req, res, next) {
 
     debug("Verifying token");
 
     var token = exports.fetch(req.headers);
 
-    jsonwebtoken.verify(token, config.secret, function (err, decode) {
+    jsonwebtoken.verify(token, config.secret, function(err, decode) {
 
         if (err) {
             req.user = undefined;
             return next(new UnauthorizedAccessError("invalid_token"));
         }
 
-        exports.retrieve(token, function (err, data) {
+        exports.retrieve(token, function(err, data) {
 
             if (err) {
                 req.user = undefined;
@@ -191,7 +189,7 @@ module.exports.verify = function (req, res, next) {
  * @param headers
  * @returns {boolean}
  */
-module.exports.expire = function (headers) {
+module.exports.expire = function(headers) {
 
     var token = exports.fetch(headers);
 
@@ -212,17 +210,20 @@ module.exports.expire = function (headers) {
  * @param res
  * @param next
  */
-module.exports.middleware = function () {
+module.exports.middleware = function(checkIfAdmin) {
 
-    var func = function (req, res, next) {
+    var func = function(req, res, next) {
 
         var token = exports.fetch(req.headers);
 
-        exports.retrieve(token, function (err, data) {
+        exports.retrieve(token, function(err, data) {
 
             if (err) {
                 req.user = undefined;
                 return next(new UnauthorizedAccessError("invalid_token", data));
+            } else if (checkIfAdmin) {
+                req.isAdmin = data.isAdmin === true;
+                next();
             } else {
                 req.user = _.merge(req.user, data);
                 next();
@@ -239,11 +240,11 @@ module.exports.middleware = function () {
 
 /**
  * Checking if mail is valid one.
- * 
+ *
  * @param mail
  * @returns {Boolean}
  */
-module.exports.isEmail = function (email) {
+module.exports.isEmail = function(email) {
     return /^[-a-z0-9~!$%^&*_=+}{\'?]+(\.[-a-z0-9~!$%^&*_=+}{\'?]+)*@([a-z0-9_][-a-z0-9_]*(\.[-a-z0-9_]+)*\.(aero|arpa|biz|com|coop|edu|gov|info|int|mil|museum|name|net|org|pro|travel|mobi|[a-z][a-z])|([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}))(:[0-9]{1,5})?$/i.test(email);
 };
 
